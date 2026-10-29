@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Coze 答题助手",
+  "version": "0.1.0",
+  "description": "识别 Coze 对话中的题目，调用你自己配置的大模型生成答案并填入输入框；默认发送前需要人工确认。",
+  "permissions": [
+    "storage"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Coze 答题助手（点击打开设置）"
+  },
+  "options_page": "src/options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.coze.cn/*",
+        "https://*.coze.com/*"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "js": [
+        "src/shared/build.js",
+        "src/shared/defaults.js",
+        "src/core/util.js",
+        "src/core/detect.js",
+        "src/core/fill.js",
+        "src/core/login.js",
+        "src/core/chapters.js",
+        "src/core/engine.js",
+        "src/content/bus.js",
+        "src/content/panel.js",
+        "src/content/main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

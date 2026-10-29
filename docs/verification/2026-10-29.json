@@ -1,0 +1,65 @@
+{
+  "checkedAt": "2026-10-29T10:44:06.007Z",
+  "node": "v24.9.0",
+  "passed": 163,
+  "total": 163,
+  "ok": true,
+  "results": [
+    {
+      "suite": "run-test",
+      "ok": true,
+      "passed": 37,
+      "total": 37,
+      "exitCode": 0,
+      "durationMs": 23645
+    },
+    {
+      "suite": "run-structure",
+      "ok": true,
+      "passed": 19,
+      "total": 19,
+      "exitCode": 0,
+      "durationMs": 16219
+    },
+    {
+      "suite": "run-noisy",
+      "ok": true,
+      "passed": 5,
+      "total": 5,
+      "exitCode": 0,
+      "durationMs": 8608
+    },
+    {
+      "suite": "run-iframe",
+      "ok": true,
+      "passed": 15,
+      "total": 15,
+      "exitCode": 0,
+      "durationMs": 37160
+    },
+    {
+      "suite": "run-login",
+      "ok": true,
+      "passed": 12,
+      "total": 12,
+      "exitCode": 0,
+      "durationMs": 17000
+    },
+    {
+      "suite": "run-e2e",
+      "ok": true,
+      "passed": 22,
+      "total": 22,
+      "exitCode": 0,
+      "durationMs": 24289
+    },
+    {
+      "suite": "run-chapters",
+      "ok": true,
+      "passed": 53,
+      "total": 53,
+      "exitCode": 0,
+      "durationMs": 30898
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>章节导航回归夹具</title>
+<style>
+  body { margin: 0; font: 15px/1.5 sans-serif; background: #edf1f5; color: #263244; }
+  header { padding: 14px 24px; background: white; border-bottom: 1px solid #ccd4df; }
+  iframe { display: block; margin: 16px; width: calc(100% - 34px); height: calc(100vh - 96px); border: 1px solid #ccd4df; background: white; }
+</style>
+<header>课程练习 · 本地测试</header>
+<script>
+  const appId = location.pathname.match(/\/project\/(\d+)/)[1];
+  window.fixture = { events: [], replacements: 0 };
+  function mount(url) {
+    const frame = document.createElement('iframe');
+    frame.id = 'app';
+    frame.src = url;
+    const old = document.querySelector('iframe');
+    if (old) { old.replaceWith(frame); fixture.replacements++; }
+    else document.body.append(frame);
+  }
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.source !== document.querySelector('iframe').contentWindow) return;
+    if (event.data.type === 'fixture-event') fixture.events.push(event.data.event);
+    if (event.data.type === 'fixture-navigate' && event.data.url.startsWith('/ui-builder-app/' + appId + '/')) {
+      mount(event.data.url);
+    }
+  });
+  mount('/ui-builder-app/' + appId + '/quiz' + location.search);
+</script>
+</html>

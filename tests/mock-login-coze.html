@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>Mock 登录页（Coze 真实结构）</title>
+<style>
+  body { margin: 0; min-height: 100vh; background: #f5f6f7;
+         font: 14px/1.6 "Microsoft YaHei", sans-serif; }
+  .banner { height: 200px; background: linear-gradient(120deg, #1b4f8a, #4a8fd4);
+            display: grid; place-items: center; color: #fff; font-size: 24px; font-weight: 700; }
+  .panel { width: 660px; margin: -40px auto 40px; background: #fff; border-radius: 12px;
+           border: 1px solid #e5e8eb; padding: 30px 40px; }
+  h2 { font-size: 18px; margin: 0 0 6px; }
+  .tip { color: #57606a; font-size: 13px; margin: 0 0 26px; }
+  .field { margin-bottom: 22px; }
+  .field .lab { font-size: 14px; color: #1f2328; margin-bottom: 8px; }
+  .field .req { color: #cf222e; margin-left: 2px; }
+  .field input { width: 100%; box-sizing: border-box; height: 44px; padding: 0 14px;
+                 border: 1px solid #d0d7de; border-radius: 8px; font: inherit; }
+  .field input:focus { outline: 2px solid #4a8fd4; border-color: transparent; }
+  button.login { width: 140px; height: 44px; border: 0; border-radius: 8px;
+                 background: #9aa4af; color: #fff; font-size: 15px; cursor: not-allowed; }
+  button.login:not([disabled]) { background: #4a8fd4; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="banner">《AI编程工具与高效开发》课程智能体</div>
+<div class="panel">
+  <h2>用户登录</h2>
+  <p class="tip">请输入学号和姓名，若登录有问题请咨询您的授课老师进行反馈。</p>
+
+  <div class="field">
+    <div class="lab">请输入学号<span class="req">*</span></div>
+    <input type="text" />
+  </div>
+
+  <div class="field">
+    <div class="lab">请输入姓名<span class="req">*</span></div>
+    <input type="text" />
+  </div>
+
+  <button class="login" type="button" disabled>登录</button>
+  <div id="msg" style="margin-top:14px;color:#cf222e;font-size:13px"></div>
+</div>
+<script>
+(function () {
+  const inputs = document.querySelectorAll('.field input');
+  const btn = document.querySelector('button.login');
+  const msg = document.getElementById('msg');
+  window.__login = { submitted: false, payload: null };
+
+  function refresh() {
+    const ok = inputs[0].value.trim() && inputs[1].value.trim();
+    btn.disabled = !ok;
+  }
+  inputs.forEach((el) => el.addEventListener('input', refresh));
+  refresh();
+
+  btn.addEventListener('click', () => {
+    window.__login.submitted = true;
+    window.__login.payload = { sid: inputs[0].value.trim(), name: inputs[1].value.trim() };
+    if (!window.__login.payload.sid || !window.__login.payload.name) {
+      msg.textContent = '请填写完整信息';
+      return;
+    }
+    document.querySelector('.panel').innerHTML =
+      '<h2>登录成功</h2><p class="tip">欢迎，' + window.__login.payload.name + '</p>';
+  });
+})();
+</script>
+</body>
+</html>

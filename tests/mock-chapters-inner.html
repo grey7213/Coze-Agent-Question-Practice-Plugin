@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>课程内容夹具</title>
+<style>
+  body { margin: 0; color: #223044; font: 15px/1.6 "Microsoft YaHei", sans-serif; }
+  main { padding: 20px; max-width: 790px; margin: auto; }
+  h2 { font-size: 18px; margin: 0 0 14px; }
+  .messages { height: 310px; overflow-y: auto; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
+  .message { padding: 8px 12px; margin: 0 0 12px; border-radius: 6px; background: white; white-space: pre-wrap; }
+  .self { background: #e5f3e9; }
+  .composer { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+  textarea { flex: 1; min-height: 62px; border: 1px solid #b4c2d4; border-radius: 6px; padding: 8px; font: inherit; }
+  button, select { border: 1px solid #b4c2d4; border-radius: 6px; padding: 8px 14px; font: inherit; background: white; cursor: pointer; }
+  button:disabled { opacity: .5; }
+  [role="combobox"], select { display: block; width: 430px; text-align: left; margin-bottom: 14px; }
+  [role="listbox"] { border: 1px solid #96a8c2; padding: 6px; width: 420px; margin-bottom: 12px; background: white; }
+  [role="option"] { padding: 8px; cursor: pointer; }
+  [role="option"]:focus { outline: 2px solid #0969da; background: #edf5ff; }
+  [aria-disabled="true"] { opacity: .4; cursor: default; }
+</style>
+<main id="course"></main>
+<script>
+  const params = new URLSearchParams(location.search);
+  const appId = location.pathname.match(/\/ui-builder-app\/(\d+)/)[1];
+  const topics = [
+    { id: 'branch', text: 'Java 基础 - if 判断、switch' },
+    { id: 'array', text: 'Java 基础 - 数组', disabled: true },
+    { id: 'loop', text: 'Java 基础 - 循环' },
+    { id: 'method', text: 'Java 基础 - 方法' }
+  ];
+  let topicId = params.get('topic') || 'branch';
+  let sequence = 0;
+  const course = document.getElementById('course');
+  const event = (name, extra = {}) => parent.postMessage({ type: 'fixture-event', event: { name, ...extra } }, location.origin);
+  const topic = () => topics.find(x => x.id === topicId);
+  function element(tag, text, attrs = {}) {
+    const el = document.createElement(tag);
+    if (text) el.textContent = text;
+    Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+    return el;
+  }
+  function message(text, type = '') {
+    const row = element('div', text, { class: 'message ' + type, 'data-message-id': topicId + '-' + (++sequence) });
+    document.querySelector('.messages').append(row);
+    row.scrollIntoView({ block: 'nearest' });
+    return row;
+  }
+  function question() {
+    return '考查知识点：【' + topic().text + '】\n【单选题】(2 分)：请选择正确的说法？\nA. 条件分支\nB. 循环结构\nC. 方法定义';
+  }
+  function grade(value = 'zero') {
+    if (value === 'resource') return '资源点余额不足，请等待额度刷新或升级到专业版';
+    return '你的回答是：A\n正确答案：A\n你的答题结果是：' + (value === 'wrong' ? '错误' : '正确') +
+      (value === 'missing' ? '' : '\n本题得分：' + (value === 'positive' ? '2' : '0')) +
+      '\n错因分析：无\n本题考查的知识点：' + topic().text;
+  }
+  function navigate(page, nextTopic) {
+    if (params.get('navigation') === 'iframe') {
+      params.set('topic', nextTopic || topicId);
+      params.set('grade', 'question');
+      parent.postMessage({ type: 'fixture-navigate',
+        url: '/ui-builder-app/' + appId + '/' + page + '?' + params }, location.origin);
+    } else if (page === 'topics') showTopics();
+    else { topicId = nextTopic; showQuiz('question'); }
+  }
+  function showQuiz(initialGrade) {
+    course.replaceChildren(element('h2', '课程答题'));
+    const list = element('div', '', { class: 'messages', role: 'log' });
+    const composer = element('div', '', { class: 'composer' });
+    const input = element('textarea', '', { id: 'answer', placeholder: '发送消息' });
+    const send = element('button', '发送', { id: 'submit' });
+    send.disabled = true;
+    input.addEventListener('input', () => { send.disabled = !input.value.trim(); });
+    send.addEventListener('click', () => {
+      if (!input.value.trim()) return;
+      event('send', { text: input.value, topic: topicId });
+      message(input.value, 'self');
+      input.value = '';
+      send.disabled = true;
+      message(grade());
+      message('本轮结束，是否继续？回复“是”。');
+    });
+    composer.append(input, send);
+    const back = element('button', '返回上一页', { id: 'back' });
+    back.addEventListener('click', () => {
+      event('back', { topic: topicId });
+      setTimeout(() => navigate('topics'), Number(params.get('backDelay') || 0));
+    });
+    course.append(list, composer, back);
+    message('欢迎使用课程练习。');
+    if (initialGrade === 'old') {
+      message(grade());
+      topicId = 'loop';
+      message(question());
+    } else if (initialGrade === 'question') message(question());
+    else message(grade(initialGrade));
+  }
+  function showTopics() {
+    course.replaceChildren(element('h2', '请选择知识点'));
+    let chosen = topicId;
+    const start = element('button', '开始答题', { id: 'start-quiz' });
+    const available = params.get('options') === 'empty' ? [] : topics;
+    const selected = id => {
+      chosen = id;
+      event('select', { topic: id });
+    };
+    if (params.get('selector') === 'native') {
+      const select = element('select');
+      for (const item of available) {
+        const option = new Option(item.text, item.id);
+        option.disabled = !!item.disabled;
+        option.selected = item.id === chosen;
+        select.add(option);
+      }
+      select.addEventListener('change', () => selected(select.value));
+      course.append(select);
+    } else {
+      const trigger = element('button', topic().text, { role: 'combobox', 'aria-expanded': 'false' });
+      function close() {
+        course.querySelector('[role="listbox"]')?.remove();
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      function open() {
+        if (trigger.getAttribute('aria-expanded') === 'true') return;
+        event('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        const listbox = element('div', '', { role: 'listbox' });
+        for (const item of available) {
+          const option = element('div', item.text, { role: 'option', tabindex: '-1', 'aria-disabled': !!item.disabled });
+          const choose = () => {
+            if (item.disabled) return;
+            selected(item.id);
+            trigger.textContent = item.text;
+            close();
+            trigger.focus();
+          };
+          option.addEventListener('keydown', ev => { if (ev.key === 'Enter') choose(); });
+          option.addEventListener('click', choose);
+          listbox.append(option);
+        }
+        if (!available.length) listbox.append(element('div', '暂无数据'));
+        course.insertBefore(listbox, start);
+      }
+      trigger.addEventListener('keydown', ev => { if (['ArrowDown', 'Enter', ' '].includes(ev.key)) open(); });
+      trigger.addEventListener('pointerdown', open);
+      course.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
+      course.append(trigger);
+    }
+    start.addEventListener('click', () => {
+      event('start', { topic: chosen });
+      course.replaceChildren(element('p', '正在加载新题目…'));
+      setTimeout(() => navigate('quiz', chosen), Number(params.get('questionDelay') || 0));
+    });
+    course.append(start);
+  }
+  if (location.pathname.endsWith('/topics')) showTopics();
+  else showQuiz(params.get('grade') || 'zero');
+</script>
+</html>

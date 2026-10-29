@@ -1,0 +1,21 @@
+# 本地密钥和个人配置
+tools/env.local.json
+.env
+.env.*
+!.env.example
+*.local.json
+
+# 测试临时拷贝
+tests/.tmp-*/
+
+# 私有验证证据、历史页面截图、浏览器会话与备份
+output/
+.playwright-cli/
+.playwright/
+specs/*.png
+*.log
+
+# 本地依赖和系统文件
+node_modules/
+.DS_Store
+Thumbs.db

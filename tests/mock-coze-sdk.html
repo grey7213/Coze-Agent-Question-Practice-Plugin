@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>Coze SDK reverse message fixture</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font:14px/1.6 sans-serif}
+.coz-layout,.ui-builder-runtime,#Page5{height:100%;overflow-y:auto}
+#Page5{padding:20px}.card{width:600px;max-width:90%;margin:auto;border:1px solid #ddd;padding:12px}
+[data-testid="chat-area.message-content"]{height:380px;overflow:hidden}
+[data-scroll-element="scrollable"]{height:100%;display:flex;flex-direction:column-reverse;overflow-y:scroll}
+.message-group-wrapper{flex-shrink:0}.group-content{display:flex;flex-direction:column-reverse}
+[data-message-id]{flex-shrink:0;padding:8px;margin:4px;background:#f4f5fa;white-space:pre-wrap}
+.composer{display:flex;gap:10px;align-items:center;margin-top:12px}textarea{width:470px;max-width:90%;height:44px}
+.send{width:36px;height:36px}.footer{font-size:12px;color:#999}.bottom-safe-area{height:20px;flex-shrink:0}
+</style></head>
+<body>
+<!-- Sanitized from the observed Coze SDK DOM: two column-reverse levels,
+     independent message IDs, and the composer inside the same deep card. -->
+<div class="coz-layout"><div><div class="ui-builder-runtime"><div id="Page5">
+<div class="card"><div><div><div><div><div>
+<div data-testid="chat-area.message-content">
+ <div id="sdk-scroll" data-scroll-element="scrollable">
+  <div class="bottom-safe-area"></div>
+  <div class="message-group-wrapper"><div><div class="group-content" id="sdk-latest">
+   <div data-message-id="fixture-008">考查知识点：【Java 基础 - if 判断、switch】
+【单选题】(2 分)：
+已知 int a = 15; if (a &gt; 10) 输出“大”，否则输出“小”。输出结果是？
+A：大；B：小；C：无输出；D：编译错误</div>
+   <div data-message-id="fixture-007">课程答题智能体
+测试同学，刚才的测试题：
+【判断题】（2 分）：Java 中 if 条件必须是 boolean 类型。
+A. 正确；B. 错误
+你的回答是：A
+正确答案：A
+你的答题结果是：正确
+本题得分：2
+错因分析：无</div>
+   <div data-message-id="fixture-006">测试用户
+A</div>
+  </div></div></div>
+  <div class="message-group-wrapper"><div><div class="group-content">
+   <div data-message-id="fixture-005">课程答题智能体
+【判断题】(2 分)：Java 中 if 条件必须是 boolean 类型。
+A：正确；B：错误</div>
+   <div data-message-id="fixture-004">测试用户
+是</div>
+  </div></div></div>
+  <div class="message-group-wrapper"><div><div class="group-content">
+   <div data-message-id="fixture-003">{"output":"恭喜你！完成了本轮作答。若想继续作答，可回复 “是”。"}</div>
+   <div data-message-id="fixture-002">课程答题智能体
+【单选题】（2 分）：下列属于算术运算符的是？
+A：&amp;&amp;；B：=；C：+；D：==
+你的回答是：C
+正确答案：C
+本题得分：2</div>
+   <div data-message-id="fixture-001">测试用户
+C</div>
+  </div></div></div>
+ </div>
+</div>
+<div class="composer"><textarea id="sdk-editor" class="rc-textarea" placeholder="发送消息"></textarea><button class="send" disabled><svg width="16" height="16"><path d="M8 2l6 6H9v6H7V8H2z"/></svg></button></div>
+<div class="footer">内容由AI生成，无法确保真实准确，仅供参考。</div>
+</div></div></div></div></div></div></div>
+<button>查看排行</button><button>返回上一页</button>
+</div></div></div></div>
+<script>
+const editor=document.querySelector('#sdk-editor'),send=document.querySelector('.send');
+window.__sdk={sent:[],append(text){const e=document.createElement('div');e.dataset.messageId='fixture-new-'+Date.now()+'-'+Math.random();e.textContent=text;document.querySelector('#sdk-latest').prepend(e);return e;}};
+editor.addEventListener('input',()=>send.disabled=!editor.value.trim());
+send.addEventListener('click',()=>{if(!editor.value.trim())return;const text=editor.value.trim();__sdk.sent.push(text);__sdk.append('测试用户\n'+text);editor.value='';editor.dispatchEvent(new InputEvent('input',{bubbles:true}));});
+</script>
+</body></html>

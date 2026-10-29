@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>Mock 登录页</title>
+<style>
+  body { margin: 0; height: 100vh; display: grid; place-items: center; background: #eef1f4;
+         font: 14px/1.6 "Microsoft YaHei", sans-serif; }
+  .card { width: 360px; background: #fff; border: 1px solid #d0d7de; border-radius: 12px; padding: 26px; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: #57606a; font-size: 12px; margin: 0 0 20px; }
+  label { display: block; font-size: 12px; color: #57606a; margin: 12px 0 4px; }
+  input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d0d7de;
+          border-radius: 6px; font: inherit; }
+  button { width: 100%; margin-top: 20px; padding: 9px; border: 0; border-radius: 8px;
+           background: #1f883d; color: #fff; font-size: 14px; cursor: pointer; }
+  button[disabled] { background: #94d3a2; }
+  .msg { margin-top: 14px; font-size: 12px; color: #cf222e; min-height: 18px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>教育教学平台</h1>
+  <p class="sub">请输入学号与姓名登录</p>
+  <label for="sid">学号</label>
+  <input id="sid" type="text" placeholder="请输入学号" autocomplete="off" />
+  <label for="sname">姓名</label>
+  <input id="sname" type="text" placeholder="请输入姓名" autocomplete="off" />
+  <button id="loginBtn" type="button" disabled>登录</button>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+(function () {
+  const sid = document.getElementById('sid');
+  const sname = document.getElementById('sname');
+  const btn = document.getElementById('loginBtn');
+  const msg = document.getElementById('msg');
+  window.__login = { submitted: false, payload: null, attempts: 0 };
+
+  function refresh() {
+    btn.disabled = !(sid.value.trim() && sname.value.trim());
+  }
+  sid.addEventListener('input', refresh);
+  sname.addEventListener('input', refresh);
+  refresh();
+
+  btn.addEventListener('click', () => {
+    window.__login.attempts += 1;
+    window.__login.submitted = true;
+    window.__login.payload = { sid: sid.value.trim(), name: sname.value.trim() };
+    if (!sid.value.trim() || !sname.value.trim()) {
+      msg.textContent = '请填写完整信息';
+      return;
+    }
+    msg.textContent = '';
+    // 模拟登录成功：替换页面
+    setTimeout(() => {
+      document.body.innerHTML =
+        '<div class="card"><h1>登录成功</h1><p class="sub">欢迎，' +
+        sname.value.trim() + '</p></div>';
+    }, 150);
+  });
+})();
+</script>
+</body>
+</html>

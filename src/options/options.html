@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Coze 答题助手 · 设置</title>
+  <style>
+    :root {
+      --fg: #1f2328; --muted: #57606a; --line: #d0d7de; --bg: #fff; --soft: #f6f8fa;
+      --ok: #1a7f37; --warn: #9a6700; --err: #cf222e; --accent: #0969da;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --fg: #e6edf3; --muted: #9198a1; --line: #30363d; --bg: #0d1117; --soft: #161b22;
+        --ok: #3fb950; --warn: #d29922; --err: #f85149; --accent: #2f81f7;
+      }
+    }
+    :root[data-theme="dark"] {
+      --fg: #e6edf3; --muted: #9198a1; --line: #30363d; --bg: #0d1117; --soft: #161b22;
+      --ok: #3fb950; --warn: #d29922; --err: #f85149; --accent: #2f81f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 28px 20px 80px; background: var(--bg); color: var(--fg);
+      font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 22px; font-size: 13px; }
+    section { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+    section h2 { font-size: 14px; margin: 0 0 14px; }
+    label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 4px; }
+    input[type="text"], input[type="password"], input[type="number"], select, textarea {
+      width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+      background: var(--bg); color: var(--fg); font: inherit; font-size: 13px;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--line); background: var(--soft); color: var(--fg);
+    }
+    button.primary { background: var(--ok); border-color: var(--ok); color: #fff; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .check { display: flex; align-items: center; gap: 8px; margin: 9px 0; font-size: 13px; }
+    .check input { margin: 0; }
+    .check small { color: var(--muted); display: block; font-size: 11.5px; }
+    #status { font-size: 12.5px; white-space: pre-wrap; }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--err); }
+    #status.warn { color: var(--warn); }
+    .hint { color: var(--muted); font-size: 11.5px; margin-top: 6px; }
+    .danger { color: var(--err); }
+    .kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Coze 答题助手</h1>
+  <p class="sub">识别 Coze 对话里的题目 → 调模型生成答案 → 填入输入框。默认发送前需要你点确认。</p>
+
+  <section>
+    <h2>模型</h2>
+    <label>服务商预设</label>
+    <select id="preset"></select>
+    <div class="row" style="margin-top:6px">
+      <button id="loadLocal">从本地配置导入</button>
+      <span class="hint" style="margin:0">读取 <code>tools/env.local.json</code>，该文件不入库</span>
+    </div>
+    <label>协议</label>
+    <select id="provider">
+      <option value="openai">OpenAI 兼容（/chat/completions）</option>
+      <option value="anthropic">Anthropic（/v1/messages）</option>
+    </select>
+    <div class="grid">
+      <div>
+        <label>接口地址</label>
+        <input id="baseUrl" type="text" placeholder="https://api.deepseek.com/v1" />
+      </div>
+      <div>
+        <label>模型名</label>
+        <input id="model" type="text" placeholder="deepseek-chat" />
+      </div>
+    </div>
+    <label>API Key（只存在本机 chrome.storage，不会发送给除该接口外的任何地方）</label>
+    <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
+    <div class="grid">
+      <div>
+        <label>temperature</label>
+        <input id="temperature" type="number" step="0.1" min="0" max="2" />
+      </div>
+      <div>
+        <label>max tokens</label>
+        <input id="maxTokens" type="number" step="32" min="64" max="8192" />
+      </div>
+    </div>
+    <label>系统提示词（留空使用默认）</label>
+    <textarea id="systemPrompt"></textarea>
+    <div class="row">
+      <button id="grant" class="primary">授权访问接口地址</button>
+      <button id="test">测试连接</button>
+      <span id="status"></span>
+    </div>
+    <p class="hint">扩展默认没有网络权限，必须在这里点一次「授权访问接口地址」，请求由后台发出。</p>
+  </section>
+
+  <section>
+    <h2>自动化</h2>
+    <label class="check">
+      <input type="checkbox" id="autoGenerate" />
+      <span>自动生成答案<small>识别到题目就调用模型</small></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="autoFill" />
+      <span>自动填入输入框<small>只写不发</small></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="requireConfirm" />
+      <span>发送前需要我确认<small>推荐保持开启</small></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="autoAdvance" />
+      <span class="danger">自动回复「是」进入下一题<small>关闭时，检测到继续提示会在面板上给出按钮，由你点</small></span>
+    </label>
+    <div class="grid">
+      <div>
+        <label>继续提示回复内容</label>
+        <input id="advanceText" type="text" placeholder="是" />
+      </div>
+      <div>
+        <label>最大轮数</label>
+        <input id="maxRounds" type="number" min="1" max="999" />
+      </div>
+      <div>
+        <label>消息稳定判定（毫秒）</label>
+        <input id="stabilizeMs" type="number" min="300" step="100" />
+      </div>
+      <div>
+        <label>操作间隔（毫秒）</label>
+        <input id="actionDelayMs" type="number" min="0" step="50" />
+      </div>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="autoSwitchChapter" />
+      <span>答对不加分时切换知识点<small>明确答对且本题得 0 分后，返回选择未完成知识点；新答案仍遵守发送前确认。</small></span>
+    </label>
+    <label>额外的「继续提示」正则（每行一个）</label>
+    <textarea id="advancePatterns" placeholder="例如：\n准备好.*了吗"></textarea>
+  </section>
+
+  <section>
+    <h2>自动登录</h2>
+    <p class="hint" style="margin-top:0">
+      只在检测到登录表单时生效。学号和姓名只保存在本机浏览器存储，不会上传。
+    </p>
+    <div class="grid">
+      <div>
+        <label>学号</label>
+        <input id="loginStudentId" type="text" autocomplete="off" spellcheck="false" />
+      </div>
+      <div>
+        <label>姓名</label>
+        <input id="loginName" type="text" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="autoLogin" />
+      <span>打开登录页时自动填写<small>仅当页面确实有登录表单才会动手</small></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="loginAutoSubmit" />
+      <span>填写后自动点「登录」<small>关闭时只填不点，由你确认</small></span>
+    </label>
+  </section>
+
+  <section>
+    <h2>手动绑定（可选）</h2>
+    <p class="hint" style="margin-top:0">如果自动识别不到，在 Coze 页面用面板上的「输入框 / 消息列表 / 发送按钮」点选绑定，会自动写回这里。</p>
+    <label>消息列表选择器</label>
+    <input id="ovMessageList" type="text" />
+    <label>输入框选择器</label>
+    <input id="ovInput" type="text" />
+    <label>发送按钮选择器</label>
+    <input id="ovSend" type="text" />
+  </section>
+
+  <div class="row">
+    <button id="save" class="primary">保存</button>
+    <button id="export">导出配置</button>
+    <button id="import">导入配置</button>
+    <span id="saveStatus" class="hint"></span>
+  </div>
+
+  <section style="margin-top:16px">
+    <h2>使用说明</h2>
+    <ol class="hint" style="margin:0;padding-left:18px;line-height:1.9">
+      <li>填入接口地址与 API Key，点「授权访问接口地址」，再「测试连接」。</li>
+      <li>打开 Coze 对话页，右下角出现面板，点「开始」。</li>
+      <li>识别到题目后自动生成答案并填入输入框，确认无误后点「发送」。</li>
+      <li>对方问「是否继续，回复是」，面板出现「发送『是』」按钮；勾选自动回「是」则由脚本自动发送。</li>
+      <li>识别不到元素时，用面板的绑定按钮点选一次，或导出调试信息。</li>
+    </ol>
+  </section>
+</main>
+<script src="../shared/defaults.js"></script>
+<script src="options.js"></script>
+</body>
+</html>
