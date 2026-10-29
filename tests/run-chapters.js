@@ -6,6 +6,8 @@ const os = require('os');
 const http = require('http');
 const { spawn } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
+const BUILD = fs.readFileSync(path.join(ROOT, 'src/shared/build.js'), 'utf8').match(/CAH\.BUILD\s*=\s*'([^']+)'/)[1];
+const BUILD_NUMBER = BUILD.match(/#(\d+)/)[1];
 const OUT = path.join(ROOT, 'output/tests/latest');
 const SHOTS = path.join(ROOT, 'output/playwright');
 const CHROME = [
@@ -263,8 +265,8 @@ async function pureCases() {
     return rows;
   });
   cases.forEach(row => check(row.name, row.ok));
-  check('新构建注入与安全默认值', await frame(page, () => /#14/.test(__CAH__.BUILD) &&
-    __CAH__.defaults.withDefaults({}).requireConfirm === true && __CAH__.defaults.withDefaults({}).autoAdvance === false));
+  check('新构建注入与安全默认值', await frame(page, expected => __CAH__.BUILD === expected &&
+    __CAH__.defaults.withDefaults({}).requireConfirm === true && __CAH__.defaults.withDefaults({}).autoAdvance === false, BUILD));
   await closePage(page);
 }
 
@@ -281,7 +283,7 @@ async function navigationCases() {
   check('换章后仍等待人工确认', state.requireConfirm && !state.autoAdvance && !log.some(x => x.name === 'send'));
   check('顶层面板显示章节与完成数', await top(page, () => /循环/.test(document.querySelector('#cah-panel-host').shadowRoot.querySelector('.chapter').textContent) &&
     /已完成 1 个/.test(document.querySelector('#cah-panel-host').shadowRoot.querySelector('.chapter').textContent)));
-  await screenshot(page, 'chapters-confirmed-fill-14.png');
+  await screenshot(page, 'chapters-confirmed-fill-' + BUILD_NUMBER + '.png');
   await clickPanel(page, '发送');
   await ready(page, '方法');
   check('连续封顶继续下一章且不重选完成章节', (await events(page)).filter(x => x.name === 'select').map(x => x.topic).join(',') === 'loop,method');
@@ -292,12 +294,36 @@ async function navigationCases() {
   check('全部可用知识点完成后停止', state.chapter.completed.length === 3 && state.rounds === 2 &&
     log.filter(x => x.name === 'start').length === 2 && !await frame(page, () => __CAH__.__test__.engine.running));
   check('章节完成记录不包含禁用项', state.chapter.completed.every(text => !text.includes('数组')));
-  await screenshot(page, 'chapters-complete-14.png');
+  await screenshot(page, 'chapters-complete-' + BUILD_NUMBER + '.png');
   await page.send('Page.reload');
   await until(async () => {
     try { return (await snapshot(page)).state === 'chapters_complete'; } catch (_) { return false; }
   }, '刷新后完成状态');
   check('刷新页面保留全部完成停止状态', !await frame(page, () => __CAH__.__test__.engine.running));
+  await closePage(page);
+}
+
+async function onboardingNavigationCase(mode) {
+  const page = await course('onboarding=1' + (mode === 'iframe' ? '&navigation=iframe' : ''));
+  const callsBefore = modelCalls.length;
+  await clickPanel(page, '开始');
+  await until(async () => ['advance_ready', 'error'].includes((await snapshot(page)).state), '换章开场 ' + mode, 25000);
+  let state = await snapshot(page);
+  check(mode + ' 换章：欢迎页恢复开场确认而非等题超时', state.state === 'advance_ready' && state.answer === '是', { state: state.state, error: state.error });
+  if (state.state !== 'advance_ready') { await closePage(page); return; }
+  check(mode + ' 换章：开场不调用模型或自动发送', modelCalls.length === callsBefore && !(await events(page)).some(x => x.name === 'send'));
+  await clickPanel(page, '发送');
+  await ready(page, '循环');
+  state = await snapshot(page);
+  check(mode + ' 换章：确认是后生成新题并填入', state.answer === 'B' && modelCalls.length === callsBefore + 1 && await frame(page, () => document.querySelector('textarea').value === 'B'));
+  check(mode + ' 换章：开场计入累计轮数并继续等待确认', state.rounds === 1 && state.requireConfirm && !state.autoAdvance && (await events(page)).filter(x => x.name === 'send').length === 1);
+  await clickPanel(page, '发送');
+  await until(async () => (await snapshot(page)).state === 'advance_ready', '第二章开场');
+  state = await snapshot(page);
+  check(mode + ' 换章：下一次开场保留完成集合及轮数', state.chapter.completed.length === 2 && state.chapter.currentTopic.includes('方法') && state.rounds === 2 && state.answer === '是');
+  await clickPanel(page, '暂停');
+  await sleep(800);
+  check(mode + ' 换章：暂停开场不会发送或重复导航', (await snapshot(page)).state === 'idle' && (await events(page)).filter(x => x.name === 'send').length === 2 && (await events(page)).filter(x => x.name === 'start').length === 2);
   await closePage(page);
 }
 
@@ -390,7 +416,7 @@ async function iframeCases() {
     log.filter(x => x.name === 'back').length === 1 && log.filter(x => x.name === 'start').length === 1);
   check('iframe 恢复保留完成集合与累计轮数', state.rounds === 4 && state.chapter.completed.length === 1 && state.answer === 'B');
   check('恢复时商店顶层不参与章节导航', await top(page, () => document.querySelector('#cah-panel-host').shadowRoot.querySelector('.err').textContent === ''));
-  await screenshot(page, 'chapters-iframe-restored-14.png');
+  await screenshot(page, 'chapters-iframe-restored-' + BUILD_NUMBER + '.png');
   const callsBeforeOther = modelCalls.length;
   const other = await course('grade=question', '200001');
   await sleep(300);
@@ -450,6 +476,8 @@ async function main() {
     await start();
     await scenario('判分单元用例', pureCases);
     await scenario('完整换章链路', navigationCases);
+    await scenario('SPA 换章开场', () => onboardingNavigationCase('SPA'));
+    await scenario('iframe 换章开场', () => onboardingNavigationCase('iframe'));
     await scenario('暂停与设置中断', interruptionCases);
     await scenario('边界页面', boundaryCases);
     await scenario('iframe 重建与进度分区', iframeCases);

@@ -93,6 +93,11 @@ async function ws(url) {
   };
 
   const srv = http.createServer((q, r) => {
+    if (q.url === '/onboarding') {
+      r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      r.end(fs.readFileSync(path.join(ROOT, 'tests/mock-coze-onboarding.html')));
+      return;
+    }
     if (q.url === '/sdk') {
       r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       r.end(fs.readFileSync(path.join(ROOT, 'tests/mock-coze-sdk.html')));
@@ -213,6 +218,15 @@ async function ws(url) {
   check('真实 SDK：连点发送及慢回复不会重复提交', sdkFlow.waiting?.sent === 1 && sdkFlow.waiting.calls === 1, JSON.stringify(sdkFlow.waiting));
   check('真实 SDK：收到判分不再回答旧题', sdkFlow.feedbackCalls === 1);
   check('真实 SDK：结束后不回扫历史继续提示', sdkFlow.finished?.calls === 1 && sdkFlow.finished.sent === 1, JSON.stringify(sdkFlow.finished));
+
+  await page.send('Page.navigate', { url: `http://127.0.0.1:${WEB_PORT}/onboarding` });
+  await sleep(900);
+  const onboardingCases = await ev(fs.readFileSync(path.join(ROOT, 'tests/onboarding-cases.js'), 'utf8'));
+  if (Array.isArray(onboardingCases)) {
+    for (const item of onboardingCases) check(item.name, item.ok, item.detail === undefined ? '' : JSON.stringify(item.detail));
+    fs.mkdirSync(path.join(ROOT, 'output/tests/latest'), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, 'output/tests/latest/onboarding-cases.json'), JSON.stringify(onboardingCases, null, 2));
+  } else check('开场测试可执行', false, JSON.stringify(onboardingCases));
 
   console.log('\n' + results.filter((r) => r.ok).length + '/' + results.length + ' 通过');
   srv.close();

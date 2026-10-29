@@ -14,15 +14,15 @@
     /say\s+(yes|next)/i
   ];
   // 「下一题：……」是题目而不是继续提示，需要排除
-  const QUESTION_HINT = [
-    /[?？]\s*$/m,
+  const CONCRETE_QUESTION_HINT = [
     /第\s*\d+\s*题/,
     /请(回答|选择|填写|判断)/,
-    /^[\s（(]*[A-Da-d][.、)）]\s+\S/m,
+    /^[\s（(]*[A-Da-d][.、)）:：]\s*\S/m,
     /(单选|多选|判断|填空|简答)题/,
     /考查知识点/,
     /\(\s*\d+\s*分\s*\)|（\s*\d+\s*分\s*）/
   ];
+  const QUESTION_HINT = [/[?？]\s*$/m].concat(CONCRETE_QUESTION_HINT);
 
   // 判分反馈 / 成绩播报：出现这些说明对方在讲评，不是在出题
   const FEEDBACK_HINT = [
@@ -85,6 +85,7 @@
     const t = text || '';
     if (t.length < 6) return false;
     if (isFeedback(t)) return false;
+    if (isContinuePrompt(t, CONTINUE_PATTERNS)) return false;
     if (QUESTION_HINT.some((r) => r.test(t))) return true;
     // 有选项行也算
     const optionLines = (t.match(/^\s*[A-Da-d][.、)）]\s+/gm) || []).length;
@@ -95,8 +96,17 @@
     const t = text || '';
     if (!t || t.length > 400) return false;
     if (isFeedback(t)) return false;
-    if (looksLikeQuestion(t)) return false;
-    return patterns.some((r) => r.test(t));
+    // A question mark alone is not a quiz: "是否继续下一题？" and the
+    // onboarding prompt both require confirmation, not an LLM answer.
+    if (CONCRETE_QUESTION_HINT.some((r) => r.test(t))) return false;
+    return isStartPrompt(t) || (patterns || CONTINUE_PATTERNS).some((r) => r.test(t));
+  }
+
+  function isStartPrompt(text) {
+    const t = String(text || '');
+    if (!t || t.length > 400 || isFeedback(t) || CONCRETE_QUESTION_HINT.some(r => r.test(t))) return false;
+    return /准备好\s*(?:开始)?\s*(?:答题|作答|练习)(?:了)?(?:吗|么|嘛)/.test(t) ||
+      /是否(?:已经)?准备好(?:开始)?(?:答题|作答|练习)/.test(t);
   }
 
   function buildPatterns(settings) {
@@ -278,10 +288,12 @@
     readMessages() {
       const list = this.resolveList();
       const rows = D.getMessageRows(list);
-      return rows.map((row) => ({ el: row, text: U.textOf(row) })).filter((m) => m.text);
+      return rows.map((row) => ({ el: row, text: D.messageText(row) })).filter((m) => m.text);
     }
 
-    isOwnMessage(text) {
+    isOwnMessage(text, row) {
+      const role = D.messageRole(row);
+      if (role) return role === 'user';
       return this.ownTexts.has(U.hash(U.norm(text)));
     }
 
@@ -293,9 +305,15 @@
       try {
         const msgs = this.readMessages();
         if (!msgs.length) return;
+        const latest = msgs.slice().reverse().find(m => this.isOwnMessage(m.text, m.el) || !isNoise(m.text));
+        if (latest && D.messageFailed(latest.el)) {
+          this.stop();
+          this.fail('Coze 显示消息发送失败。请在原消息旁点击“重新发送”，收到回复后再点“开始”。');
+          return;
+        }
         if (this.inspectMessages(msgs)) return;
         this.history = msgs.slice(-12).map((m) => ({
-          role: this.isOwnMessage(m.text) ? 'me' : 'them',
+          role: this.isOwnMessage(m.text, m.el) ? 'me' : 'them',
           text: m.text
         }));
 
@@ -341,8 +359,8 @@
         const m = msgs[i];
         const text = m.text;
         if (!text) continue;
+        if (this.isOwnMessage(text, m.el)) return null;
         if (isNoise(text)) continue;
-        if (this.isOwnMessage(text)) return null;
         return m;
       }
       return null;
@@ -357,7 +375,7 @@
         this.pendingAdvance = true;
         this.question = text.slice(0, 400);
         this.answer = this.settings.advanceText || '是';
-        this.explanation = '检测到继续提示';
+        this.explanation = isStartPrompt(text) ? '检测到开场确认，发送「' + this.answer + '」开始答题' : '检测到继续提示';
         this.answerContext = this.captureContext();
         this.emit('advance', { text: this.question, answer: this.answer });
         this.setState('advance_ready');
@@ -601,5 +619,5 @@
   }
 
   CAH.Engine = Engine;
-  CAH.classify = { looksLikeQuestion, isContinuePrompt, isFeedback, isAdvanceEcho, isNoise, isRawJson, buildPatterns };
+  CAH.classify = { looksLikeQuestion, isContinuePrompt, isStartPrompt, isFeedback, isAdvanceEcho, isNoise, isRawJson, buildPatterns };
 })();

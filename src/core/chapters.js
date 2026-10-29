@@ -166,7 +166,9 @@
       for (let i = messages.length - 1; i >= 0; i--) {
         const message = messages[i];
         const text = unwrap(message.text);
-        if (!text || C.classify.isNoise(text)) continue;
+        if (!text) continue;
+        if (this.engine.isOwnMessage(text, message.el)) return false;
+        if (C.classify.isNoise(text)) continue;
         const blocked = platformError(text);
         if (blocked) {
           this.engine.stop();
@@ -176,7 +178,6 @@
           this.commit({ phase: 'error', error: blocked, resume: false }).catch(() => {});
           return true;
         }
-        if (this.engine.isOwnMessage(text)) return false;
         const grade = parseFeedback(text);
         if (grade) { candidate = { message, grade }; break; }
         const topic = topicOf(text);
@@ -338,8 +339,12 @@
         const last = this.engine.pickTargetMessage(messages);
         const blocked = last && platformError(last.text);
         if (blocked) throw new Error(blocked);
-        return this.engine.resolveInput() && last && C.classify.looksLikeQuestion(last.text) &&
-          !C.classify.isFeedback(last.text) && normalizeTopic(topicOf(last.text)) === normalizeTopic(topic);
+        if (!this.engine.resolveInput() || !last) return false;
+        // The selected topic was already read back before Start quiz. A fresh
+        // SDK conversation now needs the normal, confirmed "是" handshake first.
+        if (C.classify.isStartPrompt(last.text)) return true;
+        return C.classify.looksLikeQuestion(last.text) && !C.classify.isFeedback(last.text) &&
+          normalizeTopic(topicOf(last.text)) === normalizeTopic(topic);
       }, '新知识点尚未出现题目，请检查 Coze 平台状态后重试。', token);
       const rounds = Math.max(this.engine.rounds, this.progress.rounds || 0);
       await this.commit({

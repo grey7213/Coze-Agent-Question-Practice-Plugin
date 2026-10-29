@@ -2,5 +2,5 @@
    面板标题和诊断输出都会显示这个值。 */
 (function () {
   const CAH = (globalThis.__CAH__ = globalThis.__CAH__ || {});
-  CAH.BUILD = '2026-10-29 #14 chapters';
+  CAH.BUILD = '2026-10-29 #18 onboarding';
 })();

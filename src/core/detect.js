@@ -5,6 +5,29 @@
 
   const INPUT_SEL = 'textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"], [role="combobox"]';
   const SEND_HINT = /(send|发送|提交|submit|send-button|btn-send)/i;
+  const OTHER_ACTION_HINT = /(microphone|upload|attachment|attach[-_]|coz_plus_circle|coz_broom|coz_stop_circle|chat-clear|record|voice|语音|录音|上传|附件|清空)/i;
+  const ONBOARDING_SEL = '[data-testid="bot.ide.chat_area.onboarding_content"]';
+  const USER_CONTENT_SEL = '[data-testid="chat_area.message.text-input-message-content"]';
+  const ASSISTANT_CONTENT_SEL = '[data-testid="bot.ide.chat_area.message.text-answer-message-content"]';
+
+  function messageContent(row, selector) {
+    return row && (row.matches(selector) ? row : row.querySelector(selector));
+  }
+
+  function messageText(row) {
+    return U.textOf(messageContent(row, USER_CONTENT_SEL) || messageContent(row, ASSISTANT_CONTENT_SEL) || row);
+  }
+
+  function messageRole(row) {
+    if (!row) return '';
+    if (messageContent(row, USER_CONTENT_SEL + ', [data-testid="chat_area.message.text-input-message"]')) return 'user';
+    if (messageContent(row, ASSISTANT_CONTENT_SEL) || row.closest(ONBOARDING_SEL)) return 'assistant';
+    return '';
+  }
+
+  function messageFailed(row) {
+    return messageRole(row) === 'user' && !!row.querySelector('[class*="icon-fail"]');
+  }
 
   // Coze SDK exposes stable message markers even when its CSS class hashes change.
   // The composer and footer share a deep ancestor with this area, so that ancestor
@@ -12,7 +35,8 @@
   function findMarkedMessageList() {
     const roots = document.querySelectorAll('[data-scroll-element="scrollable"], [data-testid="chat-area.message-content"], [role="log"]');
     const candidates = Array.from(roots).filter((el) =>
-      U.isVisible(el) && !isOurs(el) && !isNavLike(el) && el.querySelector('[data-message-id]')
+      U.isVisible(el) && !isOurs(el) && !isNavLike(el) &&
+      el.querySelector('[data-message-id], ' + ONBOARDING_SEL)
     );
     candidates.sort((a, b) =>
       Number(b.matches('[data-scroll-element="scrollable"]')) - Number(a.matches('[data-scroll-element="scrollable"]'))
@@ -164,8 +188,13 @@
       if (depth > 6) return;
       for (const el of root.children) {
         if (!U.isVisible(el) || isNavLike(el) || isOurs(el)) continue;
-        // 输入框所在的区域不是消息列表
-        if (el.querySelector('textarea, [contenteditable="true"]')) continue;
+        // The composer shares ancestors with the chat. Search those ancestors'
+        // children without treating the entire editor-containing shell as a list.
+        if (isEditable(el)) continue;
+        if (el.querySelector('textarea, [contenteditable="true"]')) {
+          walk(el, depth + 1);
+          continue;
+        }
         const kids = Array.prototype.filter.call(el.children, (c) => U.isVisible(c));
         if (kids.length >= 2) {
           const texts = kids.map((c) => U.textOf(c)).filter((t) => t.length > 0);
@@ -216,7 +245,7 @@
     if (!best || best.vertical < 2) {
       // 兜底：容器只有一个子 wrapper 时，向下找第一层有 ≥2 个可见子元素的后代
       const fallback = findListFallback(container);
-      return fallback || container;
+      return fallback || (container.querySelector('textarea, [contenteditable="true"]') ? null : container);
     }
     return best.el;
   }
@@ -228,7 +257,7 @@
       const el = queue.shift();
       if (isNavLike(el) || isOurs(el)) continue;
       let visible = Array.prototype.filter.call(el.children, (c) => U.isVisible(c) && U.textOf(c).length > 0);
-      if (visible.length >= 2) {
+      if (visible.length >= 2 && !el.querySelector('textarea, [contenteditable="true"]') && messagePurity(visible) >= 0.6) {
         const avg = visible.reduce((n, c) => n + U.textOf(c).length, 0) / visible.length;
         const score = visible.length * 2 + Math.min(U.rectOf(el).height / Math.max(innerHeight, 1), 1) * 20 + (avg > 8 ? 6 : 0);
         if (!best || score > best.score) best = { el, score };
@@ -248,6 +277,13 @@
     // The real SDK reverses both groups and messages with column-reverse. Sorting
     // the individual message rectangles yields oldest -> newest across both levels.
     if (marked.length) return marked.sort((a, b) => U.rectOf(a).top - U.rectOf(b).top);
+    // SDK welcome messages deliberately have NO_MESSAGE_ID. Read the prologue,
+    // excluding the bot title, and stop using it once real message IDs exist.
+    const onboarding = list.matches(ONBOARDING_SEL) ? list : list.querySelector(ONBOARDING_SEL);
+    if (onboarding && U.isVisible(onboarding)) {
+      const prologue = onboarding.querySelector('.chat-uikit-on-boarding__prologue') || onboarding;
+      return U.textOf(prologue) ? [prologue] : [];
+    }
     let rows = Array.prototype.filter.call(list.children, (c) => U.isVisible(c) && U.textOf(c).length > 0);
     if (rows.length >= 2) return rows;
     let cur = rows[0] || list;
@@ -323,14 +359,20 @@
         // 必须靠近输入框
         const near =
           r.top > inputRect.top - 120 && r.bottom < inputRect.bottom + 80 && Math.abs(r.left - inputRect.right) < 260;
+        // Upload and microphone controls occupy the send button's position while
+        // the editor is empty. Their icon semantics take precedence over geometry.
+        if (el.querySelector('button, [role="button"]')) continue;
         const label = [
           el.getAttribute('aria-label') || '',
           el.getAttribute('title') || '',
           el.getAttribute('data-testid') || '',
           (el.className || '').toString(),
           el.id || '',
-          U.textOf(el).slice(0, 20)
+          U.textOf(el).slice(0, 20),
+          ...Array.from(el.querySelectorAll('svg, use')).map(icon =>
+            (icon.getAttribute('class') || '') + ' ' + (icon.getAttribute('href') || ''))
         ].join(' ');
+        if (OTHER_ACTION_HINT.test(label)) continue;
         let score = 0;
         if (SEND_HINT.test(label)) score += 40;
         if (near) score += 25;
@@ -376,7 +418,7 @@
       input: input ? { path: U.cssPath(input), desc: U.describe(input), tag: input.tagName } : null,
       send: send ? { path: U.cssPath(send.el), desc: U.describe(send.el), disabled: send.disabled } : null,
       lastRowHtml: rows.length ? rows[rows.length - 1].outerHTML.slice(0, 4000) : '',
-      lastRowText: rows.length ? U.textOf(rows[rows.length - 1]).slice(0, 800) : ''
+      lastRowText: rows.length ? messageText(rows[rows.length - 1]).slice(0, 800) : ''
     };
   }
 
@@ -389,7 +431,7 @@
       const form = CAH.login.findLoginForm();
       out.steps.push({
         step: '登录表单',
-        result: form ? '识别到' : '未识别到',
+        result: form ? '识别到' : findInput() ? '当前为聊天页（无需登录表单）' : '未识别到',
         form: form ? CAH.login.describeForm(form) : null,
         inputs: CAH.login.textInputs().map((el) => {
           const r = U.rectOf(el);
@@ -403,7 +445,7 @@
             visible: r.width > 0 && r.height > 0
           };
         }),
-        submit: CAH.login.findSubmit() ? U.describe(CAH.login.findSubmit()) : '未找到'
+        submit: form ? (CAH.login.findSubmit() ? U.describe(CAH.login.findSubmit()) : '未找到') : '不适用'
       });
     }
 
@@ -441,7 +483,11 @@
       if (depth > 4) return;
       for (const el of root.children) {
         if (!U.isVisible(el) || isNavLike(el) || isOurs(el)) continue;
-        if (el.querySelector('textarea, [contenteditable="true"]')) continue;
+        if (isEditable(el)) continue;
+        if (el.querySelector('textarea, [contenteditable="true"]')) {
+          walk(el, depth + 1);
+          continue;
+        }
         const kids = Array.prototype.filter.call(el.children, (c) => U.isVisible(c));
         if (kids.length >= 2) {
           const texts = kids.map((c) => U.textOf(c)).filter((t) => t.length > 0);
@@ -477,7 +523,7 @@
     out.steps.push({
       step: '消息行',
       total: rows.length,
-      last5: rows.slice(-5).map((r) => U.textOf(r).slice(0, 90))
+      last5: rows.slice(-5).map((r) => messageText(r).slice(0, 90))
     });
 
     // 4) 输入框候选
@@ -498,11 +544,12 @@
 
     // 6) 分类结果
     if (rows.length) {
-      const lastText = U.textOf(rows[rows.length - 1]);
+      const lastText = messageText(rows[rows.length - 1]);
       out.steps.push({
         step: '分类',
         lastText: lastText.slice(0, 200),
         isQuestion: looksLikeQuestionSafe(lastText),
+        isStart: CAH.classify && CAH.classify.isStartPrompt ? CAH.classify.isStartPrompt(lastText) : false,
         isContinue: isContinueSafe(lastText),
         isFeedback: isFeedbackSafe(lastText)
       });
@@ -526,6 +573,9 @@
     findScrollContainer,
     findMessageList,
     getMessageRows,
+    messageText,
+    messageRole,
+    messageFailed,
     findInput,
     findSendButton,
     isEditable,

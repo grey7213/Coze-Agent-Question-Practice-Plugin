@@ -248,7 +248,7 @@
           lines.push('【输入框】' + s.result);
           for (const c of s.candidates || []) lines.push('  ' + c.tag + '  ' + c.path.slice(0, 80));
         } else if (s.step === '分类') {
-          lines.push('【分类】题目=' + s.isQuestion + ' 继续=' + s.isContinue + ' 反馈=' + s.isFeedback);
+          lines.push('【分类】题目=' + s.isQuestion + ' 开场=' + !!s.isStart + ' 继续=' + s.isContinue + ' 反馈=' + s.isFeedback);
           lines.push('  末条: ' + s.lastText.replace(/\n/g, ' ⏎ '));
         } else {
           lines.push('【' + s.step + '】' + (s.result || ''));

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>Coze fresh conversation fixture</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font:14px/1.6 sans-serif}
+.coz-layout,.ui-builder-runtime,#Page5{height:100%;overflow-y:auto}
+#Page5{padding:20px}.card{width:600px;max-width:90%;margin:auto;border:1px solid #ddd;padding:12px}
+[data-testid="chat-area.message-content"]{height:360px;overflow:hidden}
+[data-scroll-element="scrollable"]{height:100%;overflow-y:auto}
+[data-testid="bot.ide.chat_area.onboarding_content"]{margin:18px 0}
+.chat-uikit-on-boarding__bot{font-size:18px;font-weight:600}
+.chat-uikit-on-boarding__prologue,[data-message-id]{margin-top:12px;padding:12px;background:#f4f5fa;white-space:pre-wrap}
+.input-wrap{display:flex;gap:10px;align-items:center;margin-top:12px}textarea{flex:1;min-width:80px;height:44px}
+.actions{display:flex;flex-direction:row-reverse;gap:10px}button.icon{width:32px;height:32px;padding:6px}svg{width:18px;height:18px}
+footer{font-size:12px;color:#999}
+</style></head><body>
+<!-- Sanitized from the 2026-10-29 live SDK: onboarding has no message ID,
+     the composer shares a deep ancestor, and an empty composer shows a microphone. -->
+<div class="coz-layout flex-1 relative"><div><div class="ui-builder-runtime"><div id="Page5" class="ui-builder-page">
+ <div class="card"><div><div><div><div><div><div><div>
+  <div data-testid="chat-area.message-content">
+   <div id="onboarding-scroll" data-scroll-element="scrollable" class="scrollable--pkXa6lFnTQUbfv8X">
+    <div data-testid="bot.ide.chat_area.onboarding_content"><div><div class="chat-uikit-on-boarding">
+     <div class="chat-uikit-on-boarding__bot">《AI编程工具与高效开发》课程答题智能体</div>
+     <div class="chat-uikit-on-boarding__prologue-sug"><div class="chat-uikit-on-boarding__prologue" data-grab-mark="NO_MESSAGE_ID">同学，您好！我是你的《AI 编程工具与高效开发》课程的智能答题智能体，你准备好答题了吗？
+Tips：每轮次作答 5 道题，当前轮次作答完可以回复 “是” 继续作答。</div></div>
+    </div></div></div>
+   </div>
+  </div>
+  <div class="input-wrap">
+   <button disabled class="icon" data-testid="bot-edit-debug-chat-clear-button"><svg class="icon-icon-coz_broom"><path d="M2 2h12v12H2z"/></svg></button>
+   <textarea id="onboarding-editor" class="rc-textarea" placeholder="发送消息"></textarea>
+   <div class="actions"><span id="primary-action"></span><div role="button" class="semi-upload-add"><button class="icon semi-button" data-testid="chat-area.chat-upload-button"><svg class="icon-icon-coz_plus_circle"><path d="M2 8h12M8 2v12"/></svg></button></div></div>
+  </div>
+  <footer>内容由AI生成，无法确保真实准确，仅供参考。</footer>
+ </div></div></div></div></div></div></div></div>
+ <button>查看排行</button><button>返回上一页</button>
+</div></div></div></div>
+<script>
+const editor=document.querySelector('textarea'), primary=document.querySelector('#primary-action');
+const fixture=window.__onboarding={sent:[],unwanted:[],message:0};
+fixture.append=(text,role='assistant')=>{
+ const el=document.createElement('div');el.dataset.messageId='onboarding-'+(++fixture.message);
+ const content=document.createElement('div');
+ content.dataset.testid=role==='user'?'chat_area.message.text-input-message-content':'bot.ide.chat_area.message.text-answer-message-content';
+ content.textContent=role==='user'?text.replace(/^测试用户\n/,''):text;
+ if(role==='user'){const name=document.createElement('span');name.textContent='测试用户';el.append(name);}
+ el.append(content);document.querySelector('#onboarding-scroll').append(el);return el;
+};
+function refresh(){
+ const active=!!editor.value.trim();
+ primary.innerHTML='<button class="icon semi-button semi-button-primary coz-button" '+(active?'data-testid="bot-home-chart-send-button"':'')+'><svg class="icon-icon '+(active?'icon-icon-coz_send_fill':'icon-icon-coz_microphone')+'"><path d="M2 2l12 6L2 14z"/></svg></button>';
+ primary.querySelector('button').onclick=active?submit:()=>fixture.unwanted.push('microphone');
+}
+function submit(){
+ const text=editor.value.trim();if(!text)return;
+ fixture.sent.push(text);fixture.append('测试用户\n'+text,'user');editor.value='';refresh();
+ if(fixture.holdReply)return;
+ if(fixture.sent.length===1)setTimeout(()=>fixture.append('考查知识点：【Java基础-变量】\n【单选题】(2 分)：下列哪个是算术运算符？\nA：&&；B：=；C：+；D：=='),180);
+ else if(fixture.sent.length===2){
+  setTimeout(()=>fixture.append('你的答题结果是：正确\n本题得分：2\n本题考查的知识点：Java基础-变量'),150);
+  setTimeout(()=>fixture.append('是否继续下一题？'),350);
+ }else if(fixture.sent.length===3)setTimeout(()=>fixture.append('全部题目已完成，感谢作答。'),180);
+}
+editor.addEventListener('input',refresh);
+editor.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit();}});
+document.querySelector('[data-testid="chat-area.chat-upload-button"]').onclick=()=>fixture.unwanted.push('upload');
+document.querySelectorAll('#Page5 > button').forEach(button=>button.onclick=()=>fixture.unwanted.push('navigation'));
+refresh();
+</script></body></html>

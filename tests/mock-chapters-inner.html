@@ -65,6 +65,7 @@
     else { topicId = nextTopic; showQuiz('question'); }
   }
   function showQuiz(initialGrade) {
+    let awaitingStart = initialGrade === 'question' && params.get('onboarding') === '1';
     course.replaceChildren(element('h2', '课程答题'));
     const list = element('div', '', { class: 'messages', role: 'log' });
     const composer = element('div', '', { class: 'composer' });
@@ -78,6 +79,11 @@
       message(input.value, 'self');
       input.value = '';
       send.disabled = true;
+      if (awaitingStart) {
+        awaitingStart = false;
+        message(question());
+        return;
+      }
       message(grade());
       message('本轮结束，是否继续？回复“是”。');
     });
@@ -88,13 +94,20 @@
       setTimeout(() => navigate('topics'), Number(params.get('backDelay') || 0));
     });
     course.append(list, composer, back);
-    message('欢迎使用课程练习。');
-    if (initialGrade === 'old') {
+    if (awaitingStart) {
+      const opening = element('div', '', { 'data-testid': 'bot.ide.chat_area.onboarding_content' });
+      opening.append(element('div', '同学，你准备好答题了吗？', { class: 'chat-uikit-on-boarding__prologue' }));
+      list.append(opening);
+    } else if (initialGrade === 'old') {
+      message('欢迎使用课程练习。');
       message(grade());
       topicId = 'loop';
       message(question());
-    } else if (initialGrade === 'question') message(question());
-    else message(grade(initialGrade));
+    } else {
+      message('欢迎使用课程练习。');
+      if (initialGrade === 'question') message(question());
+      else message(grade(initialGrade));
+    }
   }
   function showTopics() {
     course.replaceChildren(element('h2', '请选择知识点'));
